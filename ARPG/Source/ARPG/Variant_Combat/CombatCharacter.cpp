@@ -10,8 +10,18 @@
 #include "Camera/CameraComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "EnhancedInputComponent.h"
+#include "InputAction.h"
+#include "InputMappingContext.h"
+#include "InputCoreTypes.h"
+#include "Kismet/GameplayStatics.h"
+#include "DrawDebugHelpers.h"
+#include "UObject/ConstructorHelpers.h"
+#if WITH_DEV_AUTOMATION_TESTS
+#include "Misc/AutomationTest.h"
+#endif
 #include "CombatLifeBar.h"
 #include "Engine/DamageEvents.h"
+#include "Engine/OverlapResult.h"
 #include "TimerManager.h"
 #include "Engine/LocalPlayer.h"
 #include "CombatPlayerController.h"
@@ -49,6 +59,29 @@ ACombatCharacter::ACombatCharacter()
 
 	// set the player tag
 	Tags.Add(FName("Player"));
+
+	// create runtime input actions for the ARPG combat kit
+	DodgeAction = CreateDefaultSubobject<UInputAction>(TEXT("DodgeAction"));
+	SkillAction = CreateDefaultSubobject<UInputAction>(TEXT("SkillAction"));
+	ARPGInputMappingContext = CreateDefaultSubobject<UInputMappingContext>(TEXT("ARPGInputMappingContext"));
+
+	if (ARPGInputMappingContext)
+	{
+		ARPGInputMappingContext->MapKey(DodgeAction, EKeys::LeftShift);
+		ARPGInputMappingContext->MapKey(SkillAction, EKeys::Q);
+	}
+
+	static ConstructorHelpers::FObjectFinder<UAnimMontage> DodgeMontageFinder(TEXT("/Game/Variant_Platforming/Anims/AM_Dash"));
+	if (DodgeMontageFinder.Succeeded())
+	{
+		DodgeMontage = DodgeMontageFinder.Object;
+	}
+
+	static ConstructorHelpers::FObjectFinder<UAnimMontage> SkillMontageFinder(TEXT("/Game/Variant_Combat/Anims/AM_ChargedAttack"));
+	if (SkillMontageFinder.Succeeded())
+	{
+		SkillMontage = SkillMontageFinder.Object;
+	}
 }
 
 void ACombatCharacter::Move(const FInputActionValue& Value)
@@ -91,6 +124,15 @@ void ACombatCharacter::ToggleCamera()
 	// call the BP hook
 	BP_ToggleCamera();
 }
+void ACombatCharacter::DodgePressed()
+{
+	DoDodge();
+}
+
+void ACombatCharacter::SkillPressed()
+{
+	DoUseSkill();
+}
 
 void ACombatCharacter::DoMove(float Right, float Forward)
 {
@@ -125,8 +167,13 @@ void ACombatCharacter::DoLook(float Yaw, float Pitch)
 void ACombatCharacter::DoComboAttackStart()
 {
 	// are we already playing an attack animation?
-	if (bIsAttacking)
+	if (bIsAttacking || bIsDodging)
 	{
+		if (bIsDodging)
+		{
+			return;
+		}
+
 		// cache the input time so we can check it later
 		CachedAttackInputTime = GetWorld()->GetTimeSeconds();
 
@@ -144,6 +191,11 @@ void ACombatCharacter::DoComboAttackEnd()
 
 void ACombatCharacter::DoChargedAttackStart()
 {
+	if (bIsDodging)
+	{
+		return;
+	}
+
 	// raise the charging attack flag
 	bIsChargingAttack = true;
 
@@ -177,6 +229,112 @@ void ACombatCharacter::DoChargedAttackEnd()
 
 		LoopOrResolveChargedAttack();
 	}
+}
+void ACombatCharacter::DoDodge()
+{
+	if (CurrentHP <= 0.0f || bIsDodging || !IsCooldownReady(GetWorld()->GetTimeSeconds(), LastDodgeTime, DodgeCooldown))
+	{
+		return;
+	}
+
+	bIsDodging = true;
+	bDodgeInvulnerable = true;
+	LastDodgeTime = GetWorld()->GetTimeSeconds();
+
+	FVector DodgeDirection = GetLastMovementInputVector();
+	DodgeDirection.Z = 0.0f;
+	if (DodgeDirection.IsNearlyZero())
+	{
+		DodgeDirection = GetActorForwardVector();
+	}
+	DodgeDirection.Normalize();
+
+	LaunchCharacter(DodgeDirection * DodgeImpulse + FVector(0.0f, 0.0f, 200.0f), true, true);
+
+	if (UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance())
+	{
+		AnimInstance->Montage_Stop(0.1f, ComboAttackMontage);
+		AnimInstance->Montage_Stop(0.1f, ChargedAttackMontage);
+
+		if (DodgeMontage)
+		{
+			AnimInstance->Montage_Play(DodgeMontage);
+		}
+	}
+
+	bIsAttacking = false;
+	bIsChargingAttack = false;
+	bHasLoopedChargedAttack = false;
+	bHasReleasedChargedAttack = false;
+	GetWorld()->GetTimerManager().SetTimer(DodgeTimer, this, &ACombatCharacter::FinishDodge, DodgeDuration, false);
+}
+
+void ACombatCharacter::DoUseSkill()
+{
+	if (CurrentHP <= 0.0f || bIsDodging || !IsCooldownReady(GetWorld()->GetTimeSeconds(), LastSkillTime, SkillCooldown))
+	{
+		return;
+	}
+
+	LastSkillTime = GetWorld()->GetTimeSeconds();
+
+	const FVector SkillOrigin = GetActorLocation();
+	TArray<FOverlapResult> Overlaps;
+	FCollisionObjectQueryParams ObjectQueryParams;
+	ObjectQueryParams.AddObjectTypesToQuery(ECC_Pawn);
+	ObjectQueryParams.AddObjectTypesToQuery(ECC_WorldDynamic);
+	ObjectQueryParams.AddObjectTypesToQuery(ECC_PhysicsBody);
+
+	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(ARPG_ActiveSkill), false, this);
+	GetWorld()->OverlapMultiByObjectType(
+		Overlaps,
+		SkillOrigin,
+		FQuat::Identity,
+		ObjectQueryParams,
+		FCollisionShape::MakeSphere(SkillRadius),
+		QueryParams);
+
+	TSet<AActor*> HitActors;
+	for (const FOverlapResult& Overlap : Overlaps)
+	{
+		AActor* Target = Overlap.GetActor();
+		if (!Target || HitActors.Contains(Target))
+		{
+			continue;
+		}
+
+		HitActors.Add(Target);
+		if (ICombatDamageable* Damageable = Cast<ICombatDamageable>(Target))
+		{
+			const FVector ImpactPoint = Target->GetActorLocation();
+			const FVector ImpactDirection = (ImpactPoint - SkillOrigin).GetSafeNormal();
+			Damageable->ApplyDamage(SkillDamage, this, ImpactPoint, ImpactDirection * 300.0f);
+		}
+	}
+
+	if (UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance(); AnimInstance && SkillMontage)
+	{
+		AnimInstance->Montage_Play(SkillMontage);
+		if (SkillMontage->IsValidSectionName(ChargeAttackSection))
+		{
+			AnimInstance->Montage_JumpToSection(ChargeAttackSection, SkillMontage);
+		}
+	}
+
+#if ENABLE_DRAW_DEBUG
+	DrawDebugSphere(GetWorld(), GetActorLocation(), SkillRadius, 24, FColor::Cyan, false, 0.75f, 0, 2.0f);
+#endif
+}
+
+void ACombatCharacter::FinishDodge()
+{
+	bIsDodging = false;
+	bDodgeInvulnerable = false;
+}
+
+bool ACombatCharacter::IsCooldownReady(float CurrentTime, float LastUsedTime, float Cooldown)
+{
+	return Cooldown <= 0.0f || CurrentTime - LastUsedTime >= Cooldown;
 }
 
 void ACombatCharacter::ResetHP()
@@ -459,6 +617,11 @@ void ACombatCharacter::RespawnCharacter()
 
 float ACombatCharacter::TakeDamage(float Damage, struct FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
+	if (bDodgeInvulnerable)
+	{
+		return 0.0f;
+	}
+
 	// only process damage if the character is still alive
 	if (CurrentHP <= 0.0f)
 	{
@@ -527,6 +690,7 @@ void ACombatCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 	// clear the respawn timer
 	GetWorld()->GetTimerManager().ClearTimer(RespawnTimer);
+	GetWorld()->GetTimerManager().ClearTimer(DodgeTimer);
 }
 
 void ACombatCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -550,6 +714,12 @@ void ACombatCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		EnhancedInputComponent->BindAction(ChargedAttackAction, ETriggerEvent::Started, this, &ACombatCharacter::ChargedAttackPressed);
 		EnhancedInputComponent->BindAction(ChargedAttackAction, ETriggerEvent::Completed, this, &ACombatCharacter::ChargedAttackReleased);
 
+		// Dodge
+		EnhancedInputComponent->BindAction(DodgeAction, ETriggerEvent::Started, this, &ACombatCharacter::DodgePressed);
+
+		// Active Skill
+		EnhancedInputComponent->BindAction(SkillAction, ETriggerEvent::Started, this, &ACombatCharacter::SkillPressed);
+
 		// Camera Side Toggle
 		EnhancedInputComponent->BindAction(ToggleCameraAction, ETriggerEvent::Triggered, this, &ACombatCharacter::ToggleCamera);
 	}
@@ -564,5 +734,27 @@ void ACombatCharacter::NotifyControllerChanged()
 	{
 		PC->SetRespawnTransform(GetActorTransform());
 	}
+
+	// register the runtime ARPG combat mappings
+	if (APlayerController* PlayerController = Cast<APlayerController>(GetController()))
+	{
+		if (UEnhancedInputLocalPlayerSubsystem* InputSubsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PlayerController->GetLocalPlayer()))
+		{
+			InputSubsystem->AddMappingContext(ARPGInputMappingContext, 1);
+		}
+	}
 }
 
+
+#if WITH_DEV_AUTOMATION_TESTS
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FARPGCombatCooldownTest, "ARPG.Combat.Cooldowns",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FARPGCombatCooldownTest::RunTest(const FString& Parameters)
+{
+	TestFalse(TEXT("Cooldown is not ready before its duration"), ACombatCharacter::IsCooldownReady(4.99f, 0.0f, 5.0f));
+	TestTrue(TEXT("Cooldown becomes ready at its duration"), ACombatCharacter::IsCooldownReady(5.0f, 0.0f, 5.0f));
+	TestTrue(TEXT("Zero cooldown is always ready"), ACombatCharacter::IsCooldownReady(0.0f, 0.0f, 0.0f));
+	return true;
+}
+#endif

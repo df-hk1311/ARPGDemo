@@ -86,6 +86,8 @@ void UARPGFlowWidget::BuildWidgetTree()
 	StatusText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Status"));
 	StatusText->SetJustification(ETextJustify::Center);
 	StatusText->SetFont(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), 16));
+	StatusText->SetAutoWrapText(true);
+	StatusText->SetWrapTextAt(560.0f);
 	StatusText->SetColorAndOpacity(FSlateColor(FLinearColor(0.75f, 0.78f, 0.85f)));
 	UVerticalBoxSlot* StatusSlot = Content->AddChildToVerticalBox(StatusText);
 	StatusSlot->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 18.0f));
@@ -116,7 +118,7 @@ void UARPGFlowWidget::RefreshContent()
 
 	case EARPGFlowState::Playing:
 		TitleText->SetText(FText::FromString(TEXT("\u7ade\u6280\u573a\u6d41\u7a0b\u9aa8\u67b6")));
-		StatusText->SetText(FText::FromString(TEXT("\u5f53\u524d\u4e3a\u4e34\u65f6\u8c03\u8bd5\u63a7\u5236\uff0c\u6218\u6597\u548c\u6ce2\u6b21\u7cfb\u7edf\u63a5\u5165\u540e\u5c06\u66ff\u6362\u3002")));
+		StatusText->SetText(FText::FromString(TEXT("\u64cd\u4f5c\uff1aWASD \u79fb\u52a8 | \u9f20\u6807\u5de6\u952e \u8fde\u62db | \u9f20\u6807\u53f3\u952e \u84c4\u529b | \u5de6 Shift \u95ea\u907f | Q \u4e3b\u52a8\u6280\u80fd")));
 		AddActionButton(FText::FromString(TEXT("\u5f3a\u5236\u80dc\u5229")), GET_FUNCTION_NAME_CHECKED(UARPGFlowWidget, HandleForceVictory));
 		AddActionButton(FText::FromString(TEXT("\u5f3a\u5236\u5931\u8d25")), GET_FUNCTION_NAME_CHECKED(UARPGFlowWidget, HandleForceDefeat));
 		AddActionButton(FText::FromString(TEXT("\u8fd4\u56de\u4e3b\u83dc\u5355")), GET_FUNCTION_NAME_CHECKED(UARPGFlowWidget, HandleReturnToMenu));

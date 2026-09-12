@@ -12,6 +12,7 @@
 class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
+class UInputMappingContext;
 struct FInputActionValue;
 class UCombatLifeBar;
 class UWidgetComponent;
@@ -73,6 +74,17 @@ protected:
 	UPROPERTY(EditAnywhere, Category ="Input")
 	UInputAction* ToggleCameraAction;
 
+	/** Dodge Input Action */
+	UPROPERTY(EditAnywhere, Category="Input")
+	UInputAction* DodgeAction;
+
+	/** Active Skill Input Action */
+	UPROPERTY(EditAnywhere, Category="Input")
+	UInputAction* SkillAction;
+
+	/** Runtime mapping context for project-specific combat inputs */
+	UPROPERTY()
+	TObjectPtr<UInputMappingContext> ARPGInputMappingContext;
 	/** Max amount of HP the character will have on respawn */
 	UPROPERTY(EditAnywhere, Category="Damage", meta = (ClampMin = 0, ClampMax = 100))
 	float MaxHP = 5.0f;
@@ -167,6 +179,37 @@ protected:
 	/** If true, the character wants to release and resolve the charged attack. */
 	bool bHasReleasedChargedAttack = false;
 
+	/** Montage used for the dodge action */
+	UPROPERTY(EditAnywhere, Category="Combat|Dodge")
+	UAnimMontage* DodgeMontage;
+
+	/** Forward impulse applied when dodging */
+	UPROPERTY(EditAnywhere, Category="Combat|Dodge", meta = (ClampMin = 0, ClampMax = 3000, Units = "cm/s"))
+	float DodgeImpulse = 1100.0f;
+
+	/** Time that dodge invulnerability remains active */
+	UPROPERTY(EditAnywhere, Category="Combat|Dodge", meta = (ClampMin = 0.05, ClampMax = 2.0, Units = "s"))
+	float DodgeDuration = 0.35f;
+
+	/** Minimum time between dodge actions */
+	UPROPERTY(EditAnywhere, Category="Combat|Dodge", meta = (ClampMin = 0, ClampMax = 10, Units = "s"))
+	float DodgeCooldown = 0.8f;
+
+	/** Montage used for the active skill placeholder */
+	UPROPERTY(EditAnywhere, Category="Combat|Skill")
+	UAnimMontage* SkillMontage;
+
+	/** Damage dealt by the first active skill */
+	UPROPERTY(EditAnywhere, Category="Combat|Skill", meta = (ClampMin = 0, ClampMax = 100))
+	float SkillDamage = 2.0f;
+
+	/** Radius of the first active skill */
+	UPROPERTY(EditAnywhere, Category="Combat|Skill", meta = (ClampMin = 0, ClampMax = 2000, Units = "cm"))
+	float SkillRadius = 350.0f;
+
+	/** Cooldown for the first active skill */
+	UPROPERTY(EditAnywhere, Category="Combat|Skill", meta = (ClampMin = 0, ClampMax = 60, Units = "s"))
+	float SkillCooldown = 5.0f;
 	/** Camera boom length while the character is dead */
 	UPROPERTY(EditAnywhere, Category="Camera", meta = (ClampMin = 0, ClampMax = 1000, Units = "cm"))
 	float DeathCameraDistance = 400.0f;
@@ -185,6 +228,20 @@ protected:
 	/** Character respawn timer */
 	FTimerHandle RespawnTimer;
 
+	/** Timer that clears dodge invulnerability */
+	FTimerHandle DodgeTimer;
+
+	/** True while the character is dodging */
+	bool bIsDodging = false;
+
+	/** True while incoming damage should be ignored */
+	bool bDodgeInvulnerable = false;
+
+	/** Time when the last dodge started */
+	float LastDodgeTime = -1000.0f;
+
+	/** Time when the last skill was used */
+	float LastSkillTime = -1000.0f;
 	/** Copy of the mesh's transform so we can reset it after ragdoll animations */
 	FTransform MeshStartingTransform;
 
@@ -213,6 +270,11 @@ protected:
 	/** Called for toggle camera side input */
 	void ToggleCamera();
 
+	/** Called for dodge input */
+	void DodgePressed();
+
+	/** Called for active skill input */
+	void SkillPressed();
 	/** BP hook to animate the camera side switch */
 	UFUNCTION(BlueprintImplementableEvent, Category="Combat")
 	void BP_ToggleCamera();
@@ -243,6 +305,16 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoChargedAttackEnd();
 
+	/** Handles dodge input from either controls or UI interfaces */
+	UFUNCTION(BlueprintCallable, Category="Input")
+	virtual void DoDodge();
+
+	/** Handles active skill input from either controls or UI interfaces */
+	UFUNCTION(BlueprintCallable, Category="Input")
+	virtual void DoUseSkill();
+
+	/** Returns true when a cooldown has elapsed */
+	static bool IsCooldownReady(float CurrentTime, float LastUsedTime, float Cooldown);
 protected:
 
 	/** Resets the character's current HP to maximum */
@@ -254,6 +326,8 @@ protected:
 	/** Performs a charged attack */
 	void ChargedAttack();
 
+	/** Clears dodge state after invulnerability ends */
+	void FinishDodge();
 	/** Called from a delegate when the attack montage ends */
 	void AttackMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 

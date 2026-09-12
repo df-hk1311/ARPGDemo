@@ -22,7 +22,11 @@ protected:
 
 private:
 	void CreateFlowWidget(APlayerController* NewPlayer);
+	void SpawnTrainingDummies();
 
 	UPROPERTY()
 	TObjectPtr<UARPGFlowWidget> FlowWidget;
+
+	UPROPERTY()
+	TSubclassOf<AActor> TrainingDummyClass;
 };
