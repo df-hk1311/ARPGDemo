@@ -15,13 +15,24 @@
 #include "Kismet/KismetSystemLibrary.h"
 #include "Styling/CoreStyle.h"
 
+TSharedRef<SWidget> UARPGFlowWidget::RebuildWidget()
+{
+	BuildWidgetTree();
+	return Super::RebuildWidget();
+}
+
+void UARPGFlowWidget::NativeOnInitialized()
+{
+	Super::NativeOnInitialized();
+	SetIsFocusable(true);
+	BuildWidgetTree();
+}
+
 void UARPGFlowWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
-	SetIsFocusable(true);
 
 	FlowSubsystem = GetGameInstance() ? GetGameInstance()->GetSubsystem<UARPGFlowSubsystem>() : nullptr;
-	BuildWidgetTree();
 
 	if (FlowSubsystem)
 	{
