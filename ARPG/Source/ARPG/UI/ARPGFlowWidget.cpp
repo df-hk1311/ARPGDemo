@@ -141,7 +141,7 @@ void UARPGFlowWidget::ApplyInputMode()
 	}
 
 	const bool bUseUIOnly = FlowSubsystem->GetFlowState() != EARPGFlowState::Playing;
-	PlayerController->SetShowMouseCursor(bUseUIOnly);
+	PlayerController->SetShowMouseCursor(true);
 
 	if (bUseUIOnly)
 	{
