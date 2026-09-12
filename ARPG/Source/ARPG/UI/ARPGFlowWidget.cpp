@@ -108,32 +108,32 @@ void UARPGFlowWidget::RefreshContent()
 	{
 	case EARPGFlowState::Boot:
 	case EARPGFlowState::MainMenu:
-		TitleText->SetText(FText::FromString(TEXT("ARPG Demo")));
-		StatusText->SetText(FText::FromString(TEXT("Flow foundation: main menu")));
-		AddActionButton(FText::FromString(TEXT("Start")), GET_FUNCTION_NAME_CHECKED(UARPGFlowWidget, HandleStartGame));
-		AddActionButton(FText::FromString(TEXT("Quit")), GET_FUNCTION_NAME_CHECKED(UARPGFlowWidget, HandleQuit));
+		TitleText->SetText(FText::FromString(TEXT("ARPG \u6f14\u793a")));
+		StatusText->SetText(FText::FromString(TEXT("\u6d41\u7a0b\u57fa\u7840\uff1a\u4e3b\u83dc\u5355")));
+		AddActionButton(FText::FromString(TEXT("\u5f00\u59cb\u6e38\u620f")), GET_FUNCTION_NAME_CHECKED(UARPGFlowWidget, HandleStartGame));
+		AddActionButton(FText::FromString(TEXT("\u9000\u51fa\u6e38\u620f")), GET_FUNCTION_NAME_CHECKED(UARPGFlowWidget, HandleQuit));
 		break;
 
 	case EARPGFlowState::Playing:
-		TitleText->SetText(FText::FromString(TEXT("Arena Flow Skeleton")));
-		StatusText->SetText(FText::FromString(TEXT("Temporary debug controls until combat and wave systems are connected.")));
-		AddActionButton(FText::FromString(TEXT("Force Victory")), GET_FUNCTION_NAME_CHECKED(UARPGFlowWidget, HandleForceVictory));
-		AddActionButton(FText::FromString(TEXT("Force Defeat")), GET_FUNCTION_NAME_CHECKED(UARPGFlowWidget, HandleForceDefeat));
-		AddActionButton(FText::FromString(TEXT("Return to Main Menu")), GET_FUNCTION_NAME_CHECKED(UARPGFlowWidget, HandleReturnToMenu));
+		TitleText->SetText(FText::FromString(TEXT("\u7ade\u6280\u573a\u6d41\u7a0b\u9aa8\u67b6")));
+		StatusText->SetText(FText::FromString(TEXT("\u5f53\u524d\u4e3a\u4e34\u65f6\u8c03\u8bd5\u63a7\u5236\uff0c\u6218\u6597\u548c\u6ce2\u6b21\u7cfb\u7edf\u63a5\u5165\u540e\u5c06\u66ff\u6362\u3002")));
+		AddActionButton(FText::FromString(TEXT("\u5f3a\u5236\u80dc\u5229")), GET_FUNCTION_NAME_CHECKED(UARPGFlowWidget, HandleForceVictory));
+		AddActionButton(FText::FromString(TEXT("\u5f3a\u5236\u5931\u8d25")), GET_FUNCTION_NAME_CHECKED(UARPGFlowWidget, HandleForceDefeat));
+		AddActionButton(FText::FromString(TEXT("\u8fd4\u56de\u4e3b\u83dc\u5355")), GET_FUNCTION_NAME_CHECKED(UARPGFlowWidget, HandleReturnToMenu));
 		break;
 
 	case EARPGFlowState::Victory:
-		TitleText->SetText(FText::FromString(TEXT("Victory")));
-		StatusText->SetText(FText::FromString(TEXT("Arena flow completed successfully.")));
-		AddActionButton(FText::FromString(TEXT("Retry")), GET_FUNCTION_NAME_CHECKED(UARPGFlowWidget, HandleRestartMatch));
-		AddActionButton(FText::FromString(TEXT("Main Menu")), GET_FUNCTION_NAME_CHECKED(UARPGFlowWidget, HandleReturnToMenu));
+		TitleText->SetText(FText::FromString(TEXT("\u80dc\u5229")));
+		StatusText->SetText(FText::FromString(TEXT("\u7ade\u6280\u573a\u6d41\u7a0b\u5df2\u6210\u529f\u5b8c\u6210\u3002")));
+		AddActionButton(FText::FromString(TEXT("\u91cd\u65b0\u6311\u6218")), GET_FUNCTION_NAME_CHECKED(UARPGFlowWidget, HandleRestartMatch));
+		AddActionButton(FText::FromString(TEXT("\u4e3b\u83dc\u5355")), GET_FUNCTION_NAME_CHECKED(UARPGFlowWidget, HandleReturnToMenu));
 		break;
 
 	case EARPGFlowState::Defeat:
-		TitleText->SetText(FText::FromString(TEXT("Defeat")));
-		StatusText->SetText(FText::FromString(TEXT("The arena run ended in defeat.")));
-		AddActionButton(FText::FromString(TEXT("Retry")), GET_FUNCTION_NAME_CHECKED(UARPGFlowWidget, HandleRestartMatch));
-		AddActionButton(FText::FromString(TEXT("Main Menu")), GET_FUNCTION_NAME_CHECKED(UARPGFlowWidget, HandleReturnToMenu));
+		TitleText->SetText(FText::FromString(TEXT("\u5931\u8d25")));
+		StatusText->SetText(FText::FromString(TEXT("\u672c\u6b21\u7ade\u6280\u573a\u6311\u6218\u5931\u8d25\u3002")));
+		AddActionButton(FText::FromString(TEXT("\u91cd\u65b0\u6311\u6218")), GET_FUNCTION_NAME_CHECKED(UARPGFlowWidget, HandleRestartMatch));
+		AddActionButton(FText::FromString(TEXT("\u4e3b\u83dc\u5355")), GET_FUNCTION_NAME_CHECKED(UARPGFlowWidget, HandleReturnToMenu));
 		break;
 
 	default:
